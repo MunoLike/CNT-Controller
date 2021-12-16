@@ -1,0 +1,6 @@
+ffmpeg
+__pycache__
+ffmpeg.exe
+result.csv
+*.avi
+*.png
