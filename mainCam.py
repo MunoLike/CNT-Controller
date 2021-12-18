@@ -20,7 +20,7 @@ present_sum = 0
 in_progress = False
 counter = 0
 wait_cnt = 0
-target_pos = (210,27,267,100)
+target_pos = (195,22,253,88)
 
 #window setup
 cv2.namedWindow(w1_name, cv2.WINDOW_NORMAL)
@@ -46,8 +46,9 @@ save = cv2.VideoWriter('/media/pi/DEFAULT/tekito.avi', fourcc, cap.get(cv2.CAP_P
 cvFpsCalc = cvFpsCalc.CvFpsCalc()
 
 #setup droptime writer
-result = open('result.csv', 'w', encoding='utf-8', newline='\n')
-result.write(f'Executed time, {datetime.now()}\n')
+now = datetime.now()
+result = open(f'result/{now.strftime("%Y%m%d-%H%M%S")}-result.csv', 'w', encoding='utf-8', newline='\n')
+result.write(f'Executed time, {now}\n')
 present_time = datetime.now()
 
 
@@ -59,7 +60,7 @@ while True:
         fps = cvFpsCalc.get()
         
         frame=cv2.rotate(frame,cv2.ROTATE_90_CLOCKWISE)
-        #frame = frame[target_pos[1]:target_pos[3], target_pos[0]:target_pos[2]]
+        frame = frame[target_pos[1]:target_pos[3], target_pos[0]:target_pos[2]]
         
         #if bg is registered
         #calculate diff
