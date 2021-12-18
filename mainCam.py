@@ -21,6 +21,7 @@ in_progress = False
 counter = 0
 wait_cnt = 0
 target_pos = (210,27,267,100)
+isCamera = False
 
 #window setup
 cv2.namedWindow(w1_name, cv2.WINDOW_NORMAL)
@@ -29,18 +30,22 @@ cv2.createTrackbar("thresh", w2_name, 40, 255, update)
 cv2.setMouseCallback(w1_name, printCoord)
 
 #setup camera
-cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH,640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT,480)
-cap.set(cv2.CAP_PROP_FPS,120)
+if isCamera:
+    cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH,640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT,480)
+    cap.set(cv2.CAP_PROP_FPS,120)
+else:
+    cap = cv2.VideoCapture('output.avi')
+
 
 if cap.isOpened() is False:
   raise IOError
 
 #setup writer
-fourcc=cv2.VideoWriter_fourcc(*'MJPG')
-size=(target_pos[2]-target_pos[0],target_pos[3]-target_pos[1])
-save = cv2.VideoWriter('/media/pi/DEFAULT/tekito.avi', fourcc, cap.get(cv2.CAP_PROP_FPS), size, True)
+# fourcc=cv2.VideoWriter_fourcc(*'MJPG')
+# size=(target_pos[2]-target_pos[0],target_pos[3]-target_pos[1])
+# save = cv2.VideoWriter('/media/pi/DEFAULT/tekito.avi', fourcc, cap.get(cv2.CAP_PROP_FPS), size, True)
 
 #setup fps counter
 cvFpsCalc = cvFpsCalc.CvFpsCalc()
