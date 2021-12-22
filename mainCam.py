@@ -4,6 +4,28 @@ from datetime import datetime
 import os
 
 import cvFpsCalc
+import pid
+
+#variables
+registered = False
+present_sum = 0
+white_sum = 0
+in_progress = False
+counter = 0
+wait_cnt = 0
+auto_reset = False
+target_flowrate = 0
+
+
+
+#consts
+W1_NAME = 'test'
+W2_NAME = 'diff'
+TARGET_POS = (152,15,213,76)
+IS_SIM = True
+INCR_DROP_THRESH = 118
+FIRST_FLOWRATE = 0.8459
+LAST_FLOWRATE = 3.383
 
 #callbacks
 def update(val):
@@ -13,27 +35,15 @@ def printCoord(e, x, y,flags, param):
 	if e == cv2.EVENT_LBUTTONDOWN:
 		print(x,y)
 
-#variables
-w1_name = 'test'
-w2_name = 'diff'
-registered = False
-present_sum = 0
-white_sum = 0
-in_progress = False
-counter = 0
-wait_cnt = 0
-target_pos = (152,15,213,76)
-isCamera = True
-auto_reset = False
 
 #window setup
-cv2.namedWindow(w1_name, cv2.WINDOW_NORMAL)
-cv2.namedWindow(w2_name, cv2.WINDOW_NORMAL)
-cv2.createTrackbar("thresh", w2_name, 25, 255, update)
-cv2.setMouseCallback(w1_name, printCoord)
+cv2.namedWindow(W1_NAME, cv2.WINDOW_NORMAL)
+cv2.namedWindow(W2_NAME, cv2.WINDOW_NORMAL)
+cv2.createTrackbar("thresh", W2_NAME, 25, 255, update)
+cv2.setMouseCallback(W1_NAME, printCoord)
 
 #setup camera
-if isCamera:
+if not IS_SIM:
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT,480)
@@ -61,6 +71,8 @@ result.write(f'Executed time, {now}\n')
 present_time = datetime.now()
 
 
+#setup pid controller
+
 #main loop
 while True:
     ret, frame = cap.read()
@@ -68,8 +80,9 @@ while True:
     if ret:
         fps = cvFpsCalc.get()
         
-        frame=cv2.rotate(frame,cv2.ROTATE_90_CLOCKWISE)
-        frame = frame[target_pos[1]:target_pos[3], target_pos[0]:target_pos[2]]
+        if not IS_SIM:
+            frame=cv2.rotate(frame,cv2.ROTATE_90_CLOCKWISE)
+            frame = frame[TARGET_POS[1]:TARGET_POS[3], TARGET_POS[0]:TARGET_POS[2]]
         
         #if bg is registered
         #calculate diff
@@ -78,7 +91,7 @@ while True:
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             mask = cv2.absdiff(gray, bg)
             #thresh:40 maybe proper
-            _, bined = cv2.threshold(mask, cv2.getTrackbarPos('thresh', w2_name), 255, cv2.THRESH_BINARY)
+            _, bined = cv2.threshold(mask, cv2.getTrackbarPos('thresh', W2_NAME), 255, cv2.THRESH_BINARY)
 
             pix_sum = np.sum(bined)
             white_sum = pix_sum / 255
@@ -86,11 +99,16 @@ while True:
                 present_sum = white_sum
                 in_progress = True
         
-            #show mask
-            cv2.imshow(w2_name, bined)
 
             #if drop is going down
             if in_progress:
+                contours, _ = cv2.findContours(bined, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                contours = filter(lambda cnt: cv2.contourArea(cnt) > 5, contours)
+                for i, cnt in enumerate(contours):
+                    ellipse = cv2.fitEllipse(cnt)
+                    isnan = np.isnan(ellipse)
+                    frame = cv2.ellipse(frame, ellipse, (0,84,211), thickness=1)
+
                 #check whether it dropped
                 if white_sum/present_sum <= 0.1:
                     counter += 1
@@ -103,8 +121,13 @@ while True:
                         print(td,f'count: {counter}')
                         result.write(f'{counter}, {td}\n')
 
+            
                     #reset
                     present_time = datetime.now()
+
+            #show mask
+            cv2.imshow(W2_NAME, bined)
+
                     
 
         if wait_cnt >= 500:
@@ -118,8 +141,20 @@ while True:
             print('auto bg reset')
             auto_reset = False
 
+
+        #drop control
+        if counter < INCR_DROP_THRESH:
+            target_flowrate = FIRST_FLOWRATE
+        else:
+            target_flowrate = LAST_FLOWRATE
+
+        #TODO: measure drop size
+        # if IS_SIM:
+            #pid.PID()
+
+
         #show raw image
-        cv2.imshow(w1_name, frame)
+        cv2.imshow(W1_NAME, frame)
         key = cv2.waitKey(1)
         if key == ord('q'):
             break
@@ -134,8 +169,8 @@ while True:
     else:
         break
 
-cv2.destroyWindow(w1_name)
-cv2.destroyWindow(w2_name)
+cv2.destroyWindow(W1_NAME)
+cv2.destroyWindow(W2_NAME)
 #firmly closing
 result.flush()
 os.fsync(result.fileno())
