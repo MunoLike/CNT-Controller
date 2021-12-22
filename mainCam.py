@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 from datetime import datetime
+import os
 
 import cvFpsCalc
 
@@ -17,16 +18,18 @@ w1_name = 'test'
 w2_name = 'diff'
 registered = False
 present_sum = 0
+white_sum = 0
 in_progress = False
 counter = 0
 wait_cnt = 0
-target_pos = (210,27,267,100)
-isCamera = False
+target_pos = (152,15,213,76)
+isCamera = True
+auto_reset = False
 
 #window setup
 cv2.namedWindow(w1_name, cv2.WINDOW_NORMAL)
 cv2.namedWindow(w2_name, cv2.WINDOW_NORMAL)
-cv2.createTrackbar("thresh", w2_name, 40, 255, update)
+cv2.createTrackbar("thresh", w2_name, 25, 255, update)
 cv2.setMouseCallback(w1_name, printCoord)
 
 #setup camera
@@ -35,6 +38,7 @@ if isCamera:
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT,480)
     cap.set(cv2.CAP_PROP_FPS,120)
+    cap.set(cv2.CAP_PROP_BRIGHTNESS, 60)
 else:
     cap = cv2.VideoCapture('output.avi')
 
@@ -105,9 +109,14 @@ while True:
 
         if wait_cnt >= 500:
             wait_cnt = 0
-            print(fps)
-        
+            print(fps, white_sum)
+            auto_reset = True
         wait_cnt += 1
+        
+        if auto_reset and white_sum <= 20:
+            bg = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            print('auto bg reset')
+            auto_reset = False
 
         #show raw image
         cv2.imshow(w1_name, frame)
@@ -127,4 +136,7 @@ while True:
 
 cv2.destroyWindow(w1_name)
 cv2.destroyWindow(w2_name)
+#firmly closing
+result.flush()
+os.fsync(result.fileno())
 result.close()
