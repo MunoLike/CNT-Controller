@@ -1,11 +1,23 @@
-from dis import Instruction
+import cv2
 import tkinter as tk
 
 
 class Application(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
-        self.master.title("test")
+
+        #variable declartion
+        self.registered = False
+        self.present_sum = 0
+        self.white_sum = 0
+        self.in_progress = False
+        self.counter = 0
+        self.wait_cnt = 0
+        self.auto_reset = False
+        self.target_flowrate = 0
+
+        #set title
+        self.master.title("CNT Film Maker")
 
         # app name
         self.app_title = tk.Label(
@@ -52,6 +64,9 @@ class Application(tk.Frame):
 
         # differences and binarized image view
 
+        # select movie or real cam
+        self.movie_radio = tk.Radiobutton
+
         # adjust to window size
         master.grid_rowconfigure(0, weight=1)
         master.grid_rowconfigure(1, weight=1)
@@ -61,7 +76,8 @@ class Application(tk.Frame):
         master.grid_columnconfigure(2, weight=0)
 
     def pwm_slider(self, e):
-        print(str(self.scale_var.get()))
+        #print(str(self.scale_var.get()))
+        pass
 
     def enter_dutybox(self, e):
         pass
