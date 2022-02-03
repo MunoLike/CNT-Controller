@@ -7,6 +7,7 @@ import glob
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
+from tkinter import ttk
 
 
 
@@ -56,20 +57,20 @@ root.title("Result Extractor")
 frame1=tk.Frame(root, padx=5, pady=5)
 frame1.grid(row=0, column=0, sticky=tk.EW)
 # ラベル
-dir_label = tk.Label(frame1, text="フォルダ参照")
+dir_label = ttk.Label(frame1, text="フォルダ参照")
 dir_label.pack(side=tk.LEFT)
 # フォルダパスインプットボックス
 dir_path_var = tk.StringVar()
-dir_entry = tk.Entry(frame1, textvariable=dir_path_var, width=30)
+dir_entry = ttk.Entry(frame1, textvariable=dir_path_var, width=30)
 dir_entry.pack(side=tk.LEFT, expand=True)
 # 参照ボタン
-dir_button = tk.Button(frame1, text="参照", command=dirdiag_clicked,width=10,height=3)
+dir_button = ttk.Button(frame1, text="参照", command=dirdiag_clicked, padding=[7,14,7,14])
 dir_button.pack(side=tk.LEFT)
 
 frame2 = tk.Frame(root, padx=5, pady=5) 
 frame2.grid(row=1, column=0, sticky=tk.EW)
 #実行ボタン
-exec_button=tk.Button(frame2, text='卍処理卍', command=execute, height=5)
+exec_button=ttk.Button(frame2, text='卍処理卍', command=execute, padding=[20])
 exec_button.pack(anchor=tk.CENTER,fill=tk.BOTH)
 
 
