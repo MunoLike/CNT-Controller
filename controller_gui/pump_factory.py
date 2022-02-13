@@ -7,38 +7,50 @@ class Pump:
         pass
 
 class PeristalticPump(Pump):
+    LED_PIN = 25 # LED pin
+
     def __init__(self):
         import spidev
+        import RPi.GPIO as GPIO
+        #LED setup
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(PeristalticPump.LED_PIN, GPIO.OUT)
+        GPIO.output(PeristalticPump.LED_PIN,True)
+        GPIO.output(PeristalticPump.LED_PIN, True)
+        #pump setup
         self.spi = spidev.SpiDev()
         self.spi.open(0, 0)
         self.spi.max_speed_hz = 100_000
 
-        self.value = 0
-
     def change_ratio(self, ratio: int):
         import spidev
         if ratio > 100:
-            print('PWM Ratio out of range:', ratio)
+            print('Pump Ratio out of range:', ratio)
             return
         if ratio < 0:
-            print('PWM Ratio out of range:', ratio)
+            print('Pump Ratio out of range:', ratio)
             return
 
         value = int(int(value)/100*4095)
         self.spi.xfer2([0b00110000 | (value >> 8), 0xFF & value])
 
     def __del__(self):
+        import RPi.GPIO as GPIO
         import spidev
+        # turn the backlight off
+        GPIO.output(PeristalticPump.LED_PIN, False)
+        GPIO.cleanup()
+        # close pump
         self.spi.xfer2([0b00110000,0])
         self.spi.close()
 
 class DummyPump(Pump):
     def change_ratio(self, ratio: int):
         if ratio > 100:
-            print('PWM Ratio out of range:', ratio)
+            print('Pump Ratio out of range:', ratio)
             return
         if ratio < 0:
-            print('PWM Ratio out of range:', ratio)
+            print('Pump Ratio out of range:', ratio)
             return
 
 

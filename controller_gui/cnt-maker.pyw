@@ -1,3 +1,5 @@
+#! /usr/bin/env python3
+
 import os
 import sys
 import time
@@ -55,11 +57,10 @@ STATUS_DROPPING = 1
 STATUS_BGRESET = 2
 STATUS_WAITING_FOR_SETBG = 3
 
-# False:use the connected camera as a video source
-# True:use a video file as a video source
-
 
 def show_inputsrc_diag():
+    # False:use the connected camera as a video source
+    # True:use a video file as a video source
     root = tk.Tk()
     root.withdraw()
     ret = messagebox.askyesnocancel('入力ソースの選択', 'カメラからの映像を入力ソースとしますか？\nはい：カメラを入力ソースとする．\nいいえ：動画ファイルを入力ソースとする．')
@@ -95,10 +96,9 @@ def designate_coords(e, x, y, flags, param):
         rect_pos[2] = x
         rect_pos[3] = y
 
-# dummy
-
 
 def update_trackbar(val):
+    # dummy
     pass
 
 
@@ -327,15 +327,16 @@ def main():
     else:
         cap = cv2.VideoCapture(src)
 
+    # TODO
     # frame size setup
     if src_type == SRCTYPE_CAMERA:
-        cv2.namedWindow(WINDOW_NAME_CROP, cv2.WINDOW_NORMAL)
+        cv2.namedWindow(WINDOW_NAME_CROP, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
         cv2.setMouseCallback(WINDOW_NAME_CROP, designate_coords)
 
     while (not is_finished_confirm_rectpos) and src_type == SRCTYPE_CAMERA:
         ret, frame = cap.read()
 
-        frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+        #frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 
         if is_started_drawing_rect:
             frame = cv2.rectangle(frame, (rect_pos[0], rect_pos[1]), (rect_pos[2], rect_pos[3]), color=(0x28, 0x70, 0xFF), thickness=1)
@@ -348,7 +349,10 @@ def main():
                 is_finished_drawing_rect = False
 
         cv2.imshow(WINDOW_NAME_CROP, frame)
-        cv2.waitKey(1)
+        if cv2.waitKey(1) == 27:
+            messagebox.showinfo('終了', '終了します．')
+            cv2.destroyWindow(WINDOW_NAME_CROP)
+            sys.exit(0)
 
     if src_type == SRCTYPE_CAMERA:
         cv2.destroyWindow(WINDOW_NAME_CROP)
