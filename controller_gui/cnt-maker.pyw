@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-import datetime
+from datetime import datetime
 import os
 import sys
 import time
@@ -37,11 +37,13 @@ counter: int = 0
 wait_cnt: int = 0
 white_sum: int = 0
 background: np.ndarray = None
-
-lock_counter = th.Lock()
+image_binarized: np.ndarray = None
+image_cropped: np.ndarray = None
 
 pump: pump_factory.Pump = None
 pump_ratio: int = 0
+
+lock: th.Lock = th.Lock()
 
 # consts
 WINDOW_NAME_CROP = 'Crop'
@@ -134,10 +136,6 @@ def info_window_thread() -> tk.Tk:
     pump_frame.pack(padx=5, pady=5)
 
     ttk.Label(pump_frame, font=('', 10), text='Pump Ratio(0~100%)').pack(padx=5, pady=5)
-    duty_box = ttk.Entry(pump_frame, width=6, font=('', 10))
-    duty_box.insert(tk.END, '0')
-    duty_box.pack(padx=5, pady=5, side=tk.LEFT)
-
     bar_duty_ratio = ttk.Scale(
         pump_frame,
         orient=tk.HORIZONTAL,
@@ -145,7 +143,11 @@ def info_window_thread() -> tk.Tk:
         from_=0,
         to=100
     )
-    bar_duty_ratio.pack(padx=5, pady=5, side=tk.LEFT)
+    bar_duty_ratio.pack(padx=5, pady=5, side=tk.RIGHT)
+
+    duty_box = ttk.Entry(pump_frame, width=6, font=('', 10))
+    duty_box.insert(tk.END, '0')
+    duty_box.pack(padx=5, pady=5, side=tk.RIGHT)
 
     def change_pwm_slider(e):
         global pump_ratio
@@ -188,7 +190,8 @@ def info_window_thread() -> tk.Tk:
 
 
 def change_status_text(status):
-    global status_text_tk
+    global status_text_tk, is_mainthread_closing
+
     if status == STATUS_WAITING_FOR_DROP:
         status_text_tk.config(foreground='green', text='Waiting for drop')
     elif status == STATUS_DROPPING:
@@ -200,22 +203,39 @@ def change_status_text(status):
 
 
 def close_window():
-    global root, is_mainthread_closing
+    global root, is_mainthread_closing, info_window, pump
     is_mainthread_closing = True
+    pump.close()
     root.destroy()
     root.quit()
+
+
+def img_show():
+    global root
+    # show images
+    lock.acquire()
+    if image_binarized is not None:
+        cv2.imshow(WINDOW_NAME_BINARY, image_binarized)
+
+    if image_cropped is not None:
+        cv2.imshow(WINDOW_NAME_RAWCROPPED, image_cropped)
+
+    key = cv2.waitKey(1)
+    lock.release()
+    # if close the windows, then end these processing
+    if key == 27 or is_mainthread_closing:
+        cv2.destroyAllWindows()
+        return
+
+    root.after(16, img_show)
 
 
 def measuring(cap, src, src_type):
     global registered, in_progress, present_sum, counter, status_count_tk, \
         recent_dropped_time, auto_reset, elapssed_total_time, wait_cnt, white_sum,\
         is_wanna_bgreset, background, elapssed_time_tk, elapssed_total_time_tk, \
-        start_measure_time, is_wanna_counter_reset
-
-    # setup windows
-    cv2.namedWindow(WINDOW_NAME_RAWCROPPED, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
-    cv2.namedWindow(WINDOW_NAME_BINARY, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
-    cv2.createTrackbar(TRACKBAR_NAME_THRESHOLD, WINDOW_NAME_BINARY, 25, 255, update_trackbar)
+        start_measure_time, is_wanna_counter_reset, image_binarized, image_cropped, \
+        pump
 
     # setup log writer
     now = datetime.now()
@@ -225,7 +245,7 @@ def measuring(cap, src, src_type):
     # setup pump control
     pump = pump_factory.create_pump()
     # Main loop
-    while True:
+    while not is_mainthread_closing:
         ret, frame = cap.read()
         if not ret:
             break
@@ -237,6 +257,10 @@ def measuring(cap, src, src_type):
         if src_type == SRCTYPE_CAMERA:
             frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
             frame = frame[x1:x2, y1:y2]
+
+        lock.acquire()
+        image_cropped = frame
+        lock.release()
 
         # process some reset flag
         if is_wanna_bgreset:
@@ -256,10 +280,12 @@ def measuring(cap, src, src_type):
         if registered:
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             mask = cv2.absdiff(gray, background)
-            _, binarized = cv2.threshold(mask, cv2.getTrackbarPos(TRACKBAR_NAME_THRESHOLD, WINDOW_NAME_BINARY),
-                                         255, cv2.THRESH_BINARY)  # ここTHRESH_BINARY_INVにしてどうなのか気になる
+            lock.acquire()
+            _, image_binarized = cv2.threshold(mask, cv2.getTrackbarPos(TRACKBAR_NAME_THRESHOLD, WINDOW_NAME_BINARY),
+                                               255, cv2.THRESH_BINARY)  # ここTHRESH_BINARY_INVにしてどうなのか気になる
+            lock.release()
 
-            pix_sum = np.sum(binarized)
+            pix_sum = np.sum(image_binarized)
             white_sum = pix_sum/255
             if white_sum >= START_MEASUREMENT_THRESHOLD:
                 present_sum = white_sum
@@ -305,20 +331,11 @@ def measuring(cap, src, src_type):
                 change_status_text(STATUS_BGRESET)
                 auto_reset = False
 
-        # show images
-        if registered:
-            cv2.imshow(WINDOW_NAME_BINARY, binarized)
-        cv2.imshow(WINDOW_NAME_RAWCROPPED, frame)
-
-        key = cv2.waitKey(1)
+        if src_type == SRCTYPE_FILE:
+            time.sleep(0.0016)
 
         # pump control
         pump.change_ratio(pump_ratio)
-
-        # if close the windows, then end these processing
-        if key == 27 or is_mainthread_closing:
-            cv2.destroyAllWindows()
-            break
 
 
 def main():
@@ -346,10 +363,10 @@ def main():
     while (not is_finished_confirm_rectpos) and src_type == SRCTYPE_CAMERA:
         ret, frame = cap.read()
 
-        #frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+        frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 
         if is_started_drawing_rect:
-            frame = cv2.rectangle(frame, (rect_pos[0], rect_pos[1]), (rect_pos[2], rect_pos[3]), color=(0x28, 0x70, 0xFF), thickness=1)
+            frame = cv2.rectangle(frame, (rect_pos[0], rect_pos[1]), (rect_pos[2], rect_pos[3]), color=(0x28, 0x70, 0xFF), thickness=3)
 
         if is_finished_drawing_rect:
             ret = messagebox.askyesno('確認', '切り抜き範囲はこれでよろしいですか？')
@@ -367,14 +384,19 @@ def main():
     if src_type == SRCTYPE_CAMERA:
         cv2.destroyWindow(WINDOW_NAME_CROP)
 
-    # init info window(due to tkinter, main thread must be assigned main thread)
+    # init info window(due to tkinter, main thread must be assigned UI thread)
     # this line must be executed before starting image processing process
     root = info_window_thread()
 
     # init opencv window
-    info_window = th.Thread(target=measuring, args=(cap, src, src_type))
-    info_window.setDaemon(True)
+    info_window = th.Thread(target=measuring, args=(cap, src, src_type), daemon=True)
     info_window.start()
+
+    # setup windows
+    cv2.namedWindow(WINDOW_NAME_RAWCROPPED, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
+    cv2.namedWindow(WINDOW_NAME_BINARY, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
+    cv2.createTrackbar(TRACKBAR_NAME_THRESHOLD, WINDOW_NAME_BINARY, 25, 255, update_trackbar)
+    root.after(16, img_show)
 
     root.protocol('WM_DELETE_WINDOW', close_window)
     root.mainloop()

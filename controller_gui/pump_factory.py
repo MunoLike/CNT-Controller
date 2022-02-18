@@ -6,6 +6,10 @@ class Pump:
     def change_ratio(self, ratio):
         pass
 
+    @abstractmethod
+    def close(self):
+        pass
+
 class PeristalticPump(Pump):
     LED_PIN = 25 # LED pin
 
@@ -34,7 +38,7 @@ class PeristalticPump(Pump):
         value = int(int(value)/100*4095)
         self.spi.xfer2([0b00110000 | (value >> 8), 0xFF & value])
 
-    def __del__(self):
+    def close(self):
         import RPi.GPIO as GPIO
         import spidev
         # turn the backlight off
@@ -52,6 +56,8 @@ class DummyPump(Pump):
         if ratio < 0:
             print('Pump Ratio out of range:', ratio)
             return
+    def close(self):
+        print('pump closed')
 
 
 def create_pump() -> Pump:
