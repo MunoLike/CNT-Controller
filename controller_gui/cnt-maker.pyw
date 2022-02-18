@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+import datetime
 import os
 import sys
 import time
@@ -216,6 +217,11 @@ def measuring(cap, src, src_type):
     cv2.namedWindow(WINDOW_NAME_BINARY, cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
     cv2.createTrackbar(TRACKBAR_NAME_THRESHOLD, WINDOW_NAME_BINARY, 25, 255, update_trackbar)
 
+    # setup log writer
+    now = datetime.now()
+    result_writer = open(f'result/{now.strftime("%Y%m%d-%H%M%S")}-result.csv', 'w', encoding='utf-8', newline='\n')
+    result_writer.write(f'Executed time, {now}\n')
+
     # setup pump control
     pump = pump_factory.create_pump()
     # Main loop
@@ -272,13 +278,15 @@ def measuring(cap, src, src_type):
                     change_status_text(STATUS_WAITING_FOR_DROP)
                     counter += 1
 
-                    # Todo: writing file
-
                     if counter == 1:
                         elapssed_total_time = 0.0
                         elapssed_time_tk.config(text=str(0.0))
                         elapssed_total_time_tk.config(text=str(0.0))
                         start_measure_time = time.time()
+                        result_writer.write(f'{counter}, 0\n')
+                    else:
+                        td = time.time() - recent_dropped_time
+                        result_writer.write(f'{counter}, {td}\n')
 
                     status_count_tk.config(text=str(counter))
                     in_progress = False
@@ -320,6 +328,8 @@ def main():
     cap = None
     if src_type == SRCTYPE_CAMERA:
         cap = cv2.VideoCapture(0)
+        if cap.isOpened() is False:
+            raise IOError
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         cap.set(cv2.CAP_PROP_FPS, 120)
